@@ -16,6 +16,9 @@ local wf = hs.window.filter
 
 local windowFilter = wf.default  -- 使用默认 filter
 
+-- 记录最近一个正常前台窗口
+local lastRealWindow = nil
+
 -- ===== 工具函数：当前 app 是否还有可见标准窗口 =====
 local function appHasVisibleStandardWindow(app)
     if not app then return false end
@@ -71,6 +74,7 @@ local function findAndFocusNextWindow()
 
     local standardWindows = wf.default:getWindows(wf.sortByFocusedLast)
 
+    -- 尝试在当前屏幕和空间找窗口
     for _, w in ipairs(standardWindows) do
         if w:screen() and w:screen():id() == mouseScreen:id() then
             local spaces = hs.spaces.windowSpaces(w:id())
@@ -85,6 +89,16 @@ local function findAndFocusNextWindow()
                 end
             end
         end
+    end
+    
+    -- 如果没找到合适的窗口,尝试恢复到最后记录的窗口
+    if lastRealWindow then
+        local success = pcall(function()
+            if lastRealWindow:isVisible() then
+                lastRealWindow:focus()
+            end
+        end)
+        if success then return end
     end
 end
 
@@ -101,6 +115,13 @@ local function triggerFindNext(delay)
 end
 
 -- ========== 订阅窗口事件 ==========
+
+-- 记录最近的正常前台窗口
+windowFilter:subscribe(wf.windowFocused, function(w, appName, event)
+    if w then
+        lastRealWindow = w
+    end
+end)
 
 -- 处理窗口销毁 / 最小化 / 隐藏事件
 windowFilter:subscribe({
@@ -120,10 +141,7 @@ windowFilter:subscribe({
                     app:activate(true)
                 end
             else
-                -- 微信没有窗口了,稍微延迟一下再切换(防止睡眠唤醒后状态异常)
-                hs.timer.doAfter(0.1, function()
-                    findAndFocusNextWindow()
-                end)
+                findAndFocusNextWindow()
             end
         end)
         return
