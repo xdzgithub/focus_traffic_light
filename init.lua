@@ -14,6 +14,12 @@ end
 local fnutils = hs.fnutils
 local wf = hs.window.filter
 
+-- 可选：你的滚轮修复模块（没有就略过）
+local scrollblock_ok, scrollblock = pcall(require, "scrollblock")
+if scrollblock_ok and scrollblock and scrollblock.start then
+    scrollblock.start()
+end
+
 local windowFilter = wf.default  -- 使用默认 filter
 
 -- ===== 工具函数：当前 app 是否还有可见标准窗口 =====
@@ -120,7 +126,10 @@ windowFilter:subscribe({
                     app:activate(true)
                 end
             else
-                findAndFocusNextWindow()
+                -- 微信没有窗口了,稍微延迟一下再切换(防止睡眠唤醒后状态异常)
+                hs.timer.doAfter(0.1, function()
+                    findAndFocusNextWindow()
+                end)
             end
         end)
         return
